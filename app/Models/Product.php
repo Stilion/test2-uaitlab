@@ -27,16 +27,25 @@ class Product extends Model
 
     protected $keyType = 'string'  ;
 
+    /**
+     * @return BelongsToMany
+     */
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class, 'product_categories');
     }
 
+    /**
+     * @return HasMany
+     */
     public function images(): HasMany
     {
         return $this->hasMany(ProductImage::class);
     }
 
+    /**
+     * @return HasMany
+     */
     public function attributes(): HasMany
     {
         return $this->hasMany(ProductAttribute::class);

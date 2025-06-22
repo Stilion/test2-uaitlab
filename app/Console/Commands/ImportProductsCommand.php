@@ -12,6 +12,11 @@ use XMLReader;
 
 class ImportProductsCommand extends Command
 {
+    /**
+     * Cache
+     *
+     * @var array
+     */
     private array $categoryCache = [];
 
     /**
@@ -105,7 +110,7 @@ class ImportProductsCommand extends Command
 
             DB::commit();
 
-            // Добавляем обновление Redis после успешного импорта
+            // Adding a Redis update after a successful import
             $this->updateRedisFilters();
 
             $this->info("Import completed successfully");
@@ -119,6 +124,10 @@ class ImportProductsCommand extends Command
         }
     }
 
+    /**
+     * @param $xmlData
+     * @return bool
+     */
     private function validateRequiredFields($xmlData): bool
     {
         return !empty((string)$xmlData['id'])
@@ -126,6 +135,11 @@ class ImportProductsCommand extends Command
             && !empty($xmlData->price);
     }
 
+    /**
+     * @param array $product
+     * @param $params
+     * @return void
+     */
     private function processParameters(array $product, $params): void
     {
         $attributes = [];
@@ -159,11 +173,20 @@ class ImportProductsCommand extends Command
             ->delete();
     }
 
+    /**
+     * @param $text
+     * @return string
+     */
     private function transliterateToKey($text): string
     {
         return Str::slug($text);
     }
 
+    /**
+     * @param $product
+     * @param $images
+     * @return void
+     */
     private function processImages($product, $images): void
     {
         $imageUrls = $images instanceof SimpleXMLElement ? [$images] : (array)$images;
@@ -193,6 +216,11 @@ class ImportProductsCommand extends Command
             ->delete();
     }
 
+    /**
+     * @param $product
+     * @param $categoryId
+     * @return void
+     */
     private function processCategories($product, $categoryId): void
     {
         $categoryIds = $categoryId instanceof SimpleXMLElement ? [$categoryId] : (array)$categoryId;
@@ -232,6 +260,10 @@ class ImportProductsCommand extends Command
         }
     }
 
+    /**
+     * @param XMLReader $reader
+     * @return void
+     */
     private function importCategories(XMLReader $reader): void
     {
         $this->info('Import categories...');
@@ -287,16 +319,19 @@ class ImportProductsCommand extends Command
         );
     }
 
+    /**
+     * @return void
+     */
     private function updateRedisFilters(): void
     {
         $this->info('Updating Redis filters...');
 
         // Clearing old data
+        $this->info('Clearing old Redis data...');
         Redis::pipeline(function ($pipe) {
             $pipe->del('products:all');
             $pipe->del('products:available');
-            // Удаляем все ключи, начинающиеся с 'filter:'
-            foreach (Redis::keys('filter:*') as $key) {
+            foreach (Redis::keys('laravel_database_filter:*') as $key) {
                 $pipe->del($key);
             }
         });
@@ -317,12 +352,16 @@ class ImportProductsCommand extends Command
         }
 
         // Processing attributes for filters
+        $this->info('Processing attributes for filters...');
         $attributes = DB::table('product_attributes')
-            ->select('product_id', 'filter_key', 'value')
+            ->select('product_id', 'filter_key', 'value', 'name')
             ->get();
 
+        $this->info('Found attributes: ' . $attributes->count());
+
         foreach ($attributes as $attribute) {
-            $filterKey = "filter:$attribute->filter_key:$attribute->value";
+
+            $filterKey = "laravel_database_filter:$attribute->filter_key:$attribute->value";
             Redis::sadd($filterKey, $attribute->product_id);
         }
 
@@ -332,7 +371,7 @@ class ImportProductsCommand extends Command
             ->get();
 
         foreach ($categoryProducts as $item) {
-            $filterKey = "filter:category:$item->category_id";
+            $filterKey = "laravel_database_filter:category:$item->category_id";
             Redis::sadd($filterKey, $item->product_id);
         }
 
@@ -353,7 +392,7 @@ class ImportProductsCommand extends Command
                 ->toArray();
 
             if (!empty($productsInRange)) {
-                Redis::sadd("filter:price:$range", $productsInRange);
+                Redis::sadd("laravel_database_filter:price:$range", $productsInRange);
             }
         }
 

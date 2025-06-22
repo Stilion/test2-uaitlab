@@ -19,16 +19,25 @@ class Category extends Model
 
     protected $keyType = 'string';
 
+    /**
+     * @return BelongsTo
+     */
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'parent_id');
     }
 
+    /**
+     * @return HasMany
+     */
     public function children(): HasMany
     {
         return $this->hasMany(Category::class, 'parent_id');
     }
 
+    /**
+     * @return BelongsToMany
+     */
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'product_categories');

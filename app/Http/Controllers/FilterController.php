@@ -10,11 +10,18 @@ class FilterController extends Controller
 {
     private FilterService $filterService;
 
+    /**
+     * @param FilterService $filterService
+     */
     public function __construct(FilterService $filterService)
     {
         $this->filterService = $filterService;
     }
 
+    /**
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function getCounts(Request $request): JsonResponse
     {
         $appliedFilters = $request->all();
@@ -23,6 +30,10 @@ class FilterController extends Controller
         return response()->json($counts);
     }
 
+    /**
+     * @param Request $request
+     * @return JsonResponse
+     */
     public function getProducts(Request $request): JsonResponse
     {
         $filters = $request->all();
@@ -31,6 +42,9 @@ class FilterController extends Controller
         return response()->json($products);
     }
 
+    /**
+     * @return JsonResponse
+     */
     public function getAvailableFilters(): JsonResponse
     {
         $filters = $this->filterService->getAvailableFilters();

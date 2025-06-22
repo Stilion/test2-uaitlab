@@ -14,7 +14,7 @@ class FilterService
         // If there are filters applied, we find the intersection
         if (!empty($appliedFilters)) {
             $intersectKeys = array_map(function ($filter, $value) {
-                return "filter:{$filter}:{$value}";
+                return "filter:$filter:$value";
             }, array_keys($appliedFilters), $appliedFilters);
 
             $baseSet = $this->getIntersection($intersectKeys);
@@ -55,7 +55,7 @@ class FilterService
         }
 
         $filterKeys = array_map(function ($filter, $value) {
-            return "filter:{$filter}:{$value}";
+            return "filter:$filter:$value";
         }, array_keys($filters), $filters);
 
         return Redis::sinter(...$filterKeys);
