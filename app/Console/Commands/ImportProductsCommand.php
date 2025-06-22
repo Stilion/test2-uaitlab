@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Exception;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use SimpleXMLElement;
@@ -103,6 +104,10 @@ class ImportProductsCommand extends Command
             }
 
             DB::commit();
+
+            // Добавляем обновление Redis после успешного импорта
+            $this->updateRedisFilters();
+
             $this->info("Import completed successfully");
             return 0;
         } catch (Exception $e) {
@@ -280,5 +285,78 @@ class ImportProductsCommand extends Command
             array_column($categories, 'id'),
             true
         );
+    }
+
+    private function updateRedisFilters(): void
+    {
+        $this->info('Updating Redis filters...');
+
+        // Clearing old data
+        Redis::pipeline(function ($pipe) {
+            $pipe->del('products:all');
+            $pipe->del('products:available');
+            // Удаляем все ключи, начинающиеся с 'filter:'
+            foreach (Redis::keys('filter:*') as $key) {
+                $pipe->del($key);
+            }
+        });
+
+        // Receiving all products
+        $products = DB::table('products')->get();
+
+        // Add IDs of all products to the common set
+        $productIds = $products->pluck('id')->toArray();
+        if (!empty($productIds)) {
+            Redis::sadd('products:all', $productIds);
+        }
+
+        // Adding IDs of available products
+        $availableProductIds = $products->where('available', true)->pluck('id')->toArray();
+        if (!empty($availableProductIds)) {
+            Redis::sadd('products:available', $availableProductIds);
+        }
+
+        // Processing attributes for filters
+        $attributes = DB::table('product_attributes')
+            ->select('product_id', 'filter_key', 'value')
+            ->get();
+
+        foreach ($attributes as $attribute) {
+            $filterKey = "filter:$attribute->filter_key:$attribute->value";
+            Redis::sadd($filterKey, $attribute->product_id);
+        }
+
+        // Processing categories
+        $categoryProducts = DB::table('product_categories')
+            ->select('product_id', 'category_id')
+            ->get();
+
+        foreach ($categoryProducts as $item) {
+            $filterKey = "filter:category:$item->category_id";
+            Redis::sadd($filterKey, $item->product_id);
+        }
+
+        // Processing price ranges
+        $priceRanges = [
+            '0-1000' => [0, 1000],
+            '1000-5000' => [1000, 5000],
+            '5000-10000' => [5000, 10000],
+            '10000-50000' => [10000, 50000],
+            '50000+' => [50000, PHP_FLOAT_MAX]
+        ];
+
+        foreach ($priceRanges as $range => $bounds) {
+            $productsInRange = $products
+                ->where('price', '>=', $bounds[0])
+                ->where('price', '<', $bounds[1])
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($productsInRange)) {
+                Redis::sadd("filter:price:$range", $productsInRange);
+            }
+        }
+
+        $this->info('Redis filters updated successfully');
     }
 }
