@@ -5,8 +5,6 @@ namespace App\Http\Controllers;
 use App\Services\CatalogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Validation\Rule;
 
 class CatalogController extends Controller
@@ -60,36 +58,5 @@ class CatalogController extends Controller
         $result = $this->catalogService->getFilters($activeFilters);
 
         return response()->json($result);
-    }
-
-    public function testRedisKeys(): JsonResponse
-    {
-        $pattern = 'laravel_database_filter:kolir:*';
-
-        // Getting all the keys
-        $keys = Redis::keys($pattern);
-        Log::info('Found Redis keys:', ['pattern' => $pattern, 'keys' => $keys]);
-
-        // Testing a specific key
-        $testKey = 'laravel_database_filter:kolir:чорний';
-        $members = Redis::smembers($testKey);
-
-        Log::info('Test specific key:', [
-            'key' => $testKey,
-            'exists_check' => Redis::exists($testKey),
-            'members_count' => count($members),
-            'first_few_members' => array_slice($members, 0, 5)
-        ]);
-
-        return response()->json([
-            'pattern' => $pattern,
-            'keys' => $keys,
-            'test_key' => [
-                'key' => $testKey,
-                'exists' => Redis::exists($testKey),
-                'members_count' => count($members),
-                'first_few_members' => array_slice($members, 0, 5)
-            ]
-        ]);
     }
 }

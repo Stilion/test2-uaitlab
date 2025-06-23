@@ -14,6 +14,10 @@ Accept: application/json
 GET http://localhost:8000/api/catalog/products?page=1&limit=10&sort_by=price_desc&filter[kolir][]=чорний&filter[kolir][]=білий
 Accept: application/json
 
-### Testing for a specific key
-GET http://localhost:8000/api/catalog/test-redis
+### Getting filters without active filters
+GET http://localhost:8000/api/catalog/filters
+Accept: application/json
+
+### Getting filters with active filters
+GET http://localhost:8000/api/catalog/filters?filter[brend][0]=47+Brand
 Accept: application/json

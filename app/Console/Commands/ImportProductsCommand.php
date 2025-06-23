@@ -12,6 +12,8 @@ use XMLReader;
 
 class ImportProductsCommand extends Command
 {
+    private const REDIS_PREFIX = 'filter:';
+
     /**
      * Cache
      *
@@ -331,7 +333,7 @@ class ImportProductsCommand extends Command
         Redis::pipeline(function ($pipe) {
             $pipe->del('products:all');
             $pipe->del('products:available');
-            foreach (Redis::keys('laravel_database_filter:*') as $key) {
+            foreach (Redis::keys(self::REDIS_PREFIX.':*') as $key) {
                 $pipe->del($key);
             }
         });
@@ -361,7 +363,7 @@ class ImportProductsCommand extends Command
 
         foreach ($attributes as $attribute) {
 
-            $filterKey = "laravel_database_filter:$attribute->filter_key:$attribute->value";
+            $filterKey = self::REDIS_PREFIX . $attribute->filter_key . ':' . $attribute->value;
             Redis::sadd($filterKey, $attribute->product_id);
         }
 
@@ -371,7 +373,7 @@ class ImportProductsCommand extends Command
             ->get();
 
         foreach ($categoryProducts as $item) {
-            $filterKey = "laravel_database_filter:category:$item->category_id";
+            $filterKey = self::REDIS_PREFIX . ":category:$item->category_id";
             Redis::sadd($filterKey, $item->product_id);
         }
 
@@ -392,7 +394,7 @@ class ImportProductsCommand extends Command
                 ->toArray();
 
             if (!empty($productsInRange)) {
-                Redis::sadd("laravel_database_filter:price:$range", $productsInRange);
+                Redis::sadd(self::REDIS_PREFIX . "price:$range", $productsInRange);
             }
         }
 
