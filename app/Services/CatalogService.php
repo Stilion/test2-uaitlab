@@ -37,7 +37,7 @@ class CatalogService
      */
     public function getProducts(int $page, int $limit, string $sortBy, array $filters): array
     {
-        $query = Product::query()->with(['attributes']);
+        $query = Product::query()->with(['attributes', 'images', 'categories']);
 
         if (!empty($filters)) {
             $productIds = $this->getFilteredProductIds($filters);
