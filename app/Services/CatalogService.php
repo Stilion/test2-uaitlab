@@ -130,17 +130,11 @@ class CatalogService
                     // We get the number of products for this value
                     $count = $this->redis->scard($filterKey);
 
-                    // Check if the value is active
-                    $isActive = isset($activeFilters[$slug]) &&
-                        (is_array($activeFilters[$slug])
-                            ? in_array($filterValue, $activeFilters[$slug])
-                            : $activeFilters[$slug] === $filterValue);
-
                     if ($count > 0) {
                         $values[] = [
                             'value' => $filterValue,
                             'count' => $count,
-                            'active' => $isActive
+                            'active' => false
                         ];
                     }
                 }
@@ -168,7 +162,7 @@ class CatalogService
             }
 
             $values = [];
-            $filterValues = (array)$filterValues; // Преобразуем в массив, если пришло одно значение
+            $filterValues = (array)$filterValues; // Converting it to an array if one value arrived
 
             foreach ($filterValues as $value) {
                 $decodedValue = urldecode($value);
