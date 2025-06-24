@@ -24,8 +24,8 @@ return new class extends Migration
                 ->on('products')
                 ->onDelete('cascade');
 
-            $table->unique(['product_id', 'name']);
-            $table->index(['name', 'value']);
+            $table->unique(['product_id', 'name']); // Unique index
+            $table->index(['name', 'value']); // Index by name and value
         });
     }
 

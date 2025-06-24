@@ -40,6 +40,7 @@ class ImportProductsCommand extends Command
      */
     public function handle(): int
     {
+        // Checking if a file exists
         $filePath = $this->argument('file');
         $this->info('Attempting to access file: ' . $filePath);
         $this->info('Current working directory: ' . getcwd());
@@ -53,19 +54,25 @@ class ImportProductsCommand extends Command
         $reader = new XMLReader();
         $reader->open($filePath);
 
+        // transaction beginning
         DB::beginTransaction();
         try {
+            // Import categories
             $this->importCategories($reader);
 
             $reader->close();
+
+            // Import products
             $reader->open($filePath);
             while ($reader->read()) {
                 if ($reader->nodeType == XMLReader::ELEMENT && $reader->name == 'offer') {
+                    // Reading all XML element and creating an XML object
                     $xmlData = new SimpleXMLElement($reader->readOuterXML());
                     $productId = (string)$xmlData['id'];
 
                     if (!$this->validateRequiredFields($xmlData)) {
                         $this->warn("Skipping product $productId due to missing required fields");
+                        continue;
                     }
 
                     $productData = [
@@ -82,11 +89,11 @@ class ImportProductsCommand extends Command
                         'updated_at' => now(),
                     ];
 
-                    // update created_at field
                     if (!DB::table('products')->where('id', $productData['id'])->exists()) {
                         $productData['created_at'] = $productData['updated_at'];
                     }
 
+                    // creating or update product data
                     DB::table('products')->upsert(
                         [$productData],
                         ['id'],
@@ -138,12 +145,15 @@ class ImportProductsCommand extends Command
     }
 
     /**
+     * Processing product parameters
+     *
      * @param array $product
      * @param $params
      * @return void
      */
     private function processParameters(array $product, $params): void
     {
+        // Creating product attributes
         $attributes = [];
         foreach ($params as $param) {
             $name = (string)$param['name'];
@@ -153,12 +163,13 @@ class ImportProductsCommand extends Command
                 'product_id' => $product['id'],
                 'name' => $name,
                 'value' => $value,
-                'filter_key' => $this->transliterateToKey($name),
+                'filter_key' => $this->transliterateToKey($name), // generate filter key
                 'created_at' => now(),
                 'updated_at' => now()
             ];
         }
 
+        // Creating or update attributes
         if (!empty($attributes)) {
             foreach (array_chunk($attributes, 100) as $chunk) {
                 DB::table('product_attributes')->upsert(
@@ -169,6 +180,7 @@ class ImportProductsCommand extends Command
             }
         }
 
+        // Removing unneeded attributes
         DB::table('product_attributes')
             ->where('product_id', $product['id'])
             ->whereNotIn('name', array_column($attributes, 'name'))
@@ -185,6 +197,8 @@ class ImportProductsCommand extends Command
     }
 
     /**
+     * Image processing
+     *
      * @param $product
      * @param $images
      * @return void
@@ -206,12 +220,14 @@ class ImportProductsCommand extends Command
             }
         }
 
+        // Saving URL image
         if (!empty($newImages)) {
             foreach (array_chunk($newImages, 100) as $chunk) {
                 DB::table('product_images')->insert($chunk);
             }
         }
 
+        // Remove old image
         DB::table('product_images')
             ->where('product_id', $product['id'])
             ->whereNotIn('image_url', array_column($newImages, 'image_url'))
@@ -219,22 +235,27 @@ class ImportProductsCommand extends Command
     }
 
     /**
+     * Processing categories
+     *
      * @param $product
      * @param $categoryId
      * @return void
      */
     private function processCategories($product, $categoryId): void
     {
+        // Converting input data into an array of categories
         $categoryIds = $categoryId instanceof SimpleXMLElement ? [$categoryId] : (array)$categoryId;
         $categories = [];
 
         foreach ($categoryIds as $id) {
             $id = (string)$id;
             if (!empty($id)) {
+                // Checking the existence of a category via cache
                 if (!isset($this->categoryCache[$id])) {
                     $this->categoryCache[$id] = DB::table('categories')->find($id) !== null;
                 }
 
+                // If the category exists, create a category existence link through the cache
                 if ($this->categoryCache[$id]) {
                     $categories[] = [
                         'product_id' => $product['id'],
@@ -263,6 +284,8 @@ class ImportProductsCommand extends Command
     }
 
     /**
+     * Import categories
+     *
      * @param XMLReader $reader
      * @return void
      */
@@ -271,6 +294,7 @@ class ImportProductsCommand extends Command
         $this->info('Import categories...');
         $categories = [];
 
+        // read categories from an XML file
         while ($reader->read()) {
             if ($reader->nodeType == XMLReader::ELEMENT && $reader->name == 'category') {
                 try {
@@ -299,12 +323,14 @@ class ImportProductsCommand extends Command
             }
         }
 
+        // Sorting categories(parent categories first)
         usort($categories, function ($a, $b) {
            if ($a['parent_id'] == $b['parent_id']) return -1;
            if (!empty($a['parent_id']) && empty($b['parent_id'])) return 1;
            return 0;
         });
 
+        // Saving to the DB
         foreach (array_chunk($categories, 100) as $chunk) {
             DB::table('categories')->upsert(
                 $chunk,
@@ -322,6 +348,8 @@ class ImportProductsCommand extends Command
     }
 
     /**
+     * Redis caching
+     *
      * @return void
      */
     private function updateRedisFilters(): void
@@ -367,7 +395,7 @@ class ImportProductsCommand extends Command
             Redis::sadd($filterKey, $attribute->product_id);
         }
 
-        // Processing categories
+        // Processing categories filter
         $categoryProducts = DB::table('product_categories')
             ->select('product_id', 'category_id')
             ->get();
@@ -377,7 +405,7 @@ class ImportProductsCommand extends Command
             Redis::sadd($filterKey, $item->product_id);
         }
 
-        // Processing price ranges
+        // Processing price ranges filter
         $priceRanges = [
             '0-1000' => [0, 1000],
             '1000-5000' => [1000, 5000],
