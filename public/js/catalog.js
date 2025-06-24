@@ -63,15 +63,17 @@ class CatalogApp {
             // Filter group header
             filterGroup.innerHTML = `
                 <h3 class="font-semibold mb-2">${filter.name}</h3>
-                <div class="space-y-2">
-                    ${filter.values.map(value => `
-                        <div class="filter-item cursor-pointer hover:bg-gray-50 p-2 rounded flex items-center justify-between ${
-                this.isFilterActive(filter.slug, value.value) ? 'bg-blue-50' : ''
-            }" data-filter="${filter.slug}" data-value="${value.value}">
-                            <span>${value.value}</span>
-                            <span class="text-gray-500 text-sm">(${value.count})</span>
-                        </div>
-                    `).join('')}
+                <div class="h-[50vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+                    <div class="space-y-2">
+                        ${filter.values.map(value => `
+                            <div class="filter-item cursor-pointer hover:bg-gray-50 p-2 rounded flex items-center justify-between ${
+                    this.isFilterActive(filter.slug, value.value) ? 'bg-blue-50' : ''
+                }" data-filter="${filter.slug}" data-value="${value.value}">
+                                <span>${value.value}</span>
+                                <span class="text-gray-500 text-sm">(${value.count})</span>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             `;
 

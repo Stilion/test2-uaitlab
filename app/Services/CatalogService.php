@@ -37,13 +37,10 @@ class CatalogService
      */
     public function getProducts(int $page, int $limit, string $sortBy, array $filters): array
     {
-        Log::info('Starting getProducts with filters:', ['filters' => $filters]);
-
         $query = Product::query()->with(['attributes']);
 
         if (!empty($filters)) {
             $productIds = $this->getFilteredProductIds($filters);
-            Log::info('Found product IDs:', ['count' => count($productIds), 'ids' => $productIds]);
 
             if (empty($productIds)) {
                 Log::info('No products found matching filters');

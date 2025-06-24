@@ -1,11 +1,3 @@
-### Get available filters
-#GET http://localhost:8000/api/filters/available
-#Accept: application/json
-
-### Getting filtered products
-#GET http://localhost:8000/api/filters/products?brend=47%20Brand&kolir=чорний%2C%20світло-сірий
-#Accept: application/json
-
 ### Test query for filtering by brand
 GET http://localhost:8000/api/catalog/products?page=1&limit=10&sort_by=price_desc&filter[brend]=47%20Brand
 Accept: application/json
@@ -20,4 +12,8 @@ Accept: application/json
 
 ### Getting filters with active filters
 GET http://localhost:8000/api/catalog/filters?filter[brend][0]=47+Brand
+Accept: application/json
+
+### Getting filters with active filters
+GET http://localhost:8000/api/catalog/products
 Accept: application/json
