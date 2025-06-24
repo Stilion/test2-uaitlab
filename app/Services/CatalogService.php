@@ -249,12 +249,13 @@ class CatalogService
             }
         }
 
-        // Find the intersection of all sets (AND between different filter types)
         if (empty($filterSets)) {
             Log::info('No filter sets found');
             return [];
         }
 
+        // Find the intersection of all sets (AND between different filter types)
+        //extracts and returns the first element of the array, removing it from `$filterSets`
         $result = array_shift($filterSets);
         foreach ($filterSets as $set) {
             $result = array_intersect($result, $set);
@@ -273,7 +274,7 @@ class CatalogService
         $decodedValue = urldecode($value);
         $redisKey = self::REDIS_PREFIX . "$key:$decodedValue";
 
-        $members = $this->redis->smembers($redisKey);
+        $members = $this->redis->smembers($redisKey); // returns all elements of a set (Set)
         if (empty($members)) {
             Log::warning('Redis key is empty or not found:', ['key' => $redisKey]);
             return null;

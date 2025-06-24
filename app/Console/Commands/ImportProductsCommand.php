@@ -12,7 +12,10 @@ use XMLReader;
 
 class ImportProductsCommand extends Command
 {
-    private const REDIS_PREFIX = 'filter:';
+    private const REDIS_FILTER_PREFIX = 'filter:';
+    private const REDIS_PRODUCTS_PREFIX = 'products:';
+    private const REDIS_CATEGORY_PREFIX = 'category:';
+    private const REDIS_PRICE_PREFIX = 'price:';
 
     /**
      * Cache
@@ -359,9 +362,12 @@ class ImportProductsCommand extends Command
         // Clearing old data
         $this->info('Clearing old Redis data...');
         Redis::pipeline(function ($pipe) {
-            $pipe->del('products:all');
-            $pipe->del('products:available');
-            foreach (Redis::keys(self::REDIS_PREFIX.':*') as $key) {
+            $pipe->del(self::REDIS_PRODUCTS_PREFIX . 'all');
+            $pipe->del(self::REDIS_PRODUCTS_PREFIX . 'available');
+            foreach (Redis::keys(self::REDIS_FILTER_PREFIX . '*') as $key) {
+                $pipe->del($key);
+            }
+            foreach (Redis::keys(self::REDIS_CATEGORY_PREFIX . '*') as $key) {
                 $pipe->del($key);
             }
         });
@@ -372,13 +378,13 @@ class ImportProductsCommand extends Command
         // Add IDs of all products to the common set
         $productIds = $products->pluck('id')->toArray();
         if (!empty($productIds)) {
-            Redis::sadd('products:all', $productIds);
+            Redis::sadd(self::REDIS_PRODUCTS_PREFIX . 'all', $productIds);
         }
 
         // Adding IDs of available products
         $availableProductIds = $products->where('available', true)->pluck('id')->toArray();
         if (!empty($availableProductIds)) {
-            Redis::sadd('products:available', $availableProductIds);
+            Redis::sadd(self::REDIS_PRODUCTS_PREFIX . 'available', $availableProductIds);
         }
 
         // Processing attributes for filters
@@ -390,8 +396,7 @@ class ImportProductsCommand extends Command
         $this->info('Found attributes: ' . $attributes->count());
 
         foreach ($attributes as $attribute) {
-
-            $filterKey = self::REDIS_PREFIX . $attribute->filter_key . ':' . $attribute->value;
+            $filterKey = self::REDIS_FILTER_PREFIX . $attribute->filter_key . ':' . $attribute->value;
             Redis::sadd($filterKey, $attribute->product_id);
         }
 
@@ -401,7 +406,7 @@ class ImportProductsCommand extends Command
             ->get();
 
         foreach ($categoryProducts as $item) {
-            $filterKey = self::REDIS_PREFIX . ":category:$item->category_id";
+            $filterKey = self::REDIS_FILTER_PREFIX . self::REDIS_CATEGORY_PREFIX . $item->category_id;
             Redis::sadd($filterKey, $item->product_id);
         }
 
@@ -422,7 +427,7 @@ class ImportProductsCommand extends Command
                 ->toArray();
 
             if (!empty($productsInRange)) {
-                Redis::sadd(self::REDIS_PREFIX . "price:$range", $productsInRange);
+                Redis::sadd(self::REDIS_FILTER_PREFIX . self::REDIS_PRICE_PREFIX . $range, $productsInRange);
             }
         }
 
