@@ -13,7 +13,6 @@ use XMLReader;
 class ImportProductsCommand extends Command
 {
     private const REDIS_FILTER_PREFIX = 'filter:';
-    private const REDIS_PRODUCTS_PREFIX = 'products:';
     private const REDIS_CATEGORY_PREFIX = 'category:';
     private const REDIS_PRICE_PREFIX = 'price:';
 
@@ -362,8 +361,6 @@ class ImportProductsCommand extends Command
         // Clearing old data
         $this->info('Clearing old Redis data...');
         Redis::pipeline(function ($pipe) {
-            $pipe->del(self::REDIS_PRODUCTS_PREFIX . 'all');
-            $pipe->del(self::REDIS_PRODUCTS_PREFIX . 'available');
             foreach (Redis::keys(self::REDIS_FILTER_PREFIX . '*') as $key) {
                 $pipe->del($key);
             }
@@ -374,18 +371,6 @@ class ImportProductsCommand extends Command
 
         // Receiving all products
         $products = DB::table('products')->get();
-
-        // Add IDs of all products to the common set
-        $productIds = $products->pluck('id')->toArray();
-        if (!empty($productIds)) {
-            Redis::sadd(self::REDIS_PRODUCTS_PREFIX . 'all', $productIds);
-        }
-
-        // Adding IDs of available products
-        $availableProductIds = $products->where('available', true)->pluck('id')->toArray();
-        if (!empty($availableProductIds)) {
-            Redis::sadd(self::REDIS_PRODUCTS_PREFIX . 'available', $availableProductIds);
-        }
 
         // Processing attributes for filters
         $this->info('Processing attributes for filters...');

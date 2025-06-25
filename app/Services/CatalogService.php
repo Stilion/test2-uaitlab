@@ -106,40 +106,52 @@ class CatalogService
 
         $result = [];
 
-        // If there are no active filters, return the base structure
-        if (empty($activeFilters)) {
-            foreach ($availableFilters as $slug => $name) {
-                // Get all keys for the current filter
-                $filterPattern = self::REDIS_PREFIX . $slug . ':*';
-                $filterKeys = $this->redis->keys($filterPattern);
+        // If there are active filters, first get the IDs of the products that match these filters
+        $filteredProductIds = [];
+        if (!empty($activeFilters)) {
+            $filteredProductIds = $this->getFilteredProductIds($activeFilters);
+        }
 
-                $values = [];
-                $processedValues = []; // To track already processed values
+        // We process all available filters
+        foreach ($availableFilters as $slug => $name) {
+            $values = [];
+            $processedValues = []; // To track already processed values
 
-                foreach ($filterKeys as $filterKey) {
-                    // We get the filter value from the key
-                    $parts = explode(':', $filterKey);
-                    $filterValue = end($parts);
+            // Get all keys for the current filter
+            $filterPattern = self::REDIS_PREFIX . $slug . ':*';
+            $filterKeys = $this->redis->keys($filterPattern);
 
-                    // Skipping already processed values
-                    if (in_array($filterValue, $processedValues)) {
-                        continue;
-                    }
-                    $processedValues[] = $filterValue;
+            foreach ($filterKeys as $filterKey) {
+                // We get the filter value from the key
+                $parts = explode(':', $filterKey);
+                $filterValue = end($parts);
 
-                    // We get the number of products for this value
+                // Skipping already processed values
+                if (in_array($filterValue, $processedValues)) {
+                    continue;
+                }
+                $processedValues[] = $filterValue;
+
+                // If there are active filters, we check for intersection
+                if (!empty($filteredProductIds)) {
+                    $productIds = $this->redis->sMembers($filterKey);
+                    $count = count(array_intersect($filteredProductIds, $productIds));
+                } else {
                     $count = $this->redis->scard($filterKey);
-
-                    if ($count > 0) {
-                        $values[] = [
-                            'value' => $filterValue,
-                            'count' => $count,
-                            'active' => false
-                        ];
-                    }
                 }
 
-                // Sort values alphabetically
+                if ($count > 0) {
+                    $values[] = [
+                        'value' => $filterValue,
+                        'count' => $count,
+                        'active' => isset($activeFilters[$slug]) &&
+                            in_array($filterValue, (array)$activeFilters[$slug])
+                    ];
+                }
+            }
+
+            // Sort values alphabetically
+            if (!empty($values)) {
                 usort($values, function($a, $b) {
                     return strcmp($a['value'], $b['value']);
                 });
@@ -147,67 +159,6 @@ class CatalogService
                 $result[] = [
                     'name' => $name,
                     'slug' => $slug,
-                    'values' => $values
-                ];
-            }
-
-            return $result;
-        }
-
-        // Processing active filters
-        foreach ($activeFilters as $filterName => $filterValues) {
-            // Skipping filters that are not in the list of available ones
-            if (!isset($availableFilters[$filterName])) {
-                continue;
-            }
-
-            $values = [];
-            $filterValues = (array)$filterValues; // Converting it to an array if one value arrived
-
-            foreach ($filterValues as $value) {
-                $decodedValue = urldecode($value);
-                $filterKey = self::REDIS_PREFIX . "$filterName:$decodedValue";
-
-                $matchingKeys = $this->redis->keys($filterKey);
-
-                foreach ($matchingKeys as $key) {
-                    $count = $this->redis->scard($key);
-
-                    if ($count > 0) {
-                        $values[] = [
-                            'value' => $value,
-                            'count' => $count,
-                            'active' => true
-                        ];
-                    }
-                }
-            }
-
-            // Also add other possible values for this filter
-            $allFilterKeys = $this->redis->keys(self::REDIS_PREFIX . "$filterName:*");
-            foreach ($allFilterKeys as $key) {
-                $parts = explode(':', $key);
-                $filterValue = end($parts);
-
-                // Skipping already added active values
-                if (in_array($filterValue, $filterValues)) {
-                    continue;
-                }
-
-                $count = $this->redis->scard($key);
-                if ($count > 0) {
-                    $values[] = [
-                        'value' => $filterValue,
-                        'count' => $count,
-                        'active' => false
-                    ];
-                }
-            }
-
-            if (!empty($values)) {
-                $result[] = [
-                    'name' => $availableFilters[$filterName],
-                    'slug' => $filterName,
                     'values' => $values
                 ];
             }
@@ -223,63 +174,34 @@ class CatalogService
     private function getFilteredProductIds(array $filters): array
     {
         $filterSets = [];
-        foreach ($filters as $key => $value) {
-            if (is_array($value)) {
-                $orSets = [];
-                foreach ($value as $val) {
-                    if ($members = $this->getRedisMembers($key, $val)) {
-                        $orSets[] = $members;
-                    }
-                }
 
-                // Combine results for one filter type (OR)
-                if (!empty($orSets)) {
-                    $mergedSet = array_unique(array_merge(...$orSets));
-                    Log::info('Merged OR set:', [
-                        'filter' => $key,
-                        'count' => count($mergedSet),
-                        'first_few' => array_slice($mergedSet, 0, 5)
-                    ]);
-                    $filterSets[] = $mergedSet;
-                }
-            } else {
-                if ($members = $this->getRedisMembers($key, $value)) {
-                    $filterSets[] = $members;
-                }
+        foreach ($filters as $filterName => $filterValues) {
+            $filterValues = (array)$filterValues;
+            $filterSet = [];
+
+            foreach ($filterValues as $value) {
+                $filterKey = self::REDIS_PREFIX . $filterName . ':' . urldecode($value);
+                $members = $this->redis->sMembers($filterKey);
+
+                // For values of one filter we use union (OR)
+                $filterSet = empty($filterSet) ? $members : array_unique(array_merge($filterSet, $members));
+            }
+
+            if (!empty($filterSet)) {
+                $filterSets[] = $filterSet;
             }
         }
 
         if (empty($filterSets)) {
-            Log::info('No filter sets found');
             return [];
         }
 
         // Find the intersection of all sets (AND between different filter types)
-        //extracts and returns the first element of the array, removing it from `$filterSets`
         $result = array_shift($filterSets);
         foreach ($filterSets as $set) {
             $result = array_intersect($result, $set);
         }
 
         return array_values($result);
-    }
-
-    /**
-     * @param string $key
-     * @param string $value
-     * @return array|null
-     */
-    private function getRedisMembers(string $key, string $value): ?array
-    {
-        $decodedValue = urldecode($value);
-        $redisKey = self::REDIS_PREFIX . "$key:$decodedValue";
-
-        $members = $this->redis->smembers($redisKey); // returns all elements of a set (Set)
-        if (empty($members)) {
-            Log::warning('Redis key is empty or not found:', ['key' => $redisKey]);
-            return null;
-        }
-
-        return $members;
     }
 }

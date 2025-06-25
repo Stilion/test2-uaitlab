@@ -27,7 +27,7 @@ class CatalogApp {
             const response = await axios.get('/api/catalog/filters', {
                 params: { filter: this.activeFilters }
             });
-            this.filtersData = response.data; // Сохраняем данные о фильтрах
+            this.filtersData = response.data; // Saving filters data
             this.renderFilters(response.data);
             this.renderActiveFilters();
         } catch (error) {
