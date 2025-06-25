@@ -69,7 +69,7 @@ class CatalogApp {
                             <div class="filter-item cursor-pointer hover:bg-gray-50 p-2 rounded flex items-center justify-between ${
                     this.isFilterActive(filter.slug, value.value) ? 'bg-blue-50' : ''
                 }" data-filter="${filter.slug}" data-value="${value.value}">
-                                <span>${value.value}</span>
+                                <span>${value.display_value || value.value}</span>
                                 <span class="text-gray-500 text-sm">(${value.count})</span>
                             </div>
                         `).join('')}
@@ -98,11 +98,14 @@ class CatalogApp {
             values.forEach(value => {
                 const filterGroup = this.filtersData.find(f => f.slug === filterName);
                 const filterLabel = filterGroup ? filterGroup.name : filterName;
+                const filterValue = filterGroup ?
+                    (filterGroup.values.find(v => v.value === value)?.display_value || value) :
+                    value;
 
                 const tag = document.createElement('div');
                 tag.className = 'bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center gap-2';
                 tag.innerHTML = `
-                    <span>${filterLabel}: ${value}</span>
+                    <span>${filterLabel}: ${filterValue}</span>
                     <button class="text-blue-600 hover:text-blue-800" data-filter="${filterName}" data-value="${value}">
                         ×
                     </button>

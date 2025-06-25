@@ -409,10 +409,11 @@ class ImportProductsCommand extends Command
                 ->where('price', '>=', $bounds[0])
                 ->where('price', '<', $bounds[1])
                 ->pluck('id')
-                ->toArray();
+                ->all();
 
             if (!empty($productsInRange)) {
-                Redis::sadd(self::REDIS_FILTER_PREFIX . self::REDIS_PRICE_PREFIX . $range, $productsInRange);
+                $filterKey = self::REDIS_FILTER_PREFIX . self::REDIS_PRICE_PREFIX . $range;
+                Redis::sadd($filterKey, ...$productsInRange);
             }
         }
 

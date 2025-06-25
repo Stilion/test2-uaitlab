@@ -18,3 +18,11 @@ Accept: application/json
 GET http://localhost:8000/api/catalog/products?page=1&limit=10&sort_by=price_desc&filter[brend][0]=MARVEL&filter[kolir][0]=антрацит
 Accept: application/json
 
+### Getting price filters
+GET http://localhost:8000/api/catalog/products?page=1&limit=10&sort_by=price_desc&filter[price][0]=0-1000
+Accept: application/json
+
+### Getting Category filters
+GET http://localhost:8000/api/catalog/products?page=1&limit=10&sort_by=price_desc&filter[category][0]=00000000110
+Accept: application/json
+

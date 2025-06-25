@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Redis;
 
@@ -90,10 +91,12 @@ class CatalogService
     public function getFilters(array $activeFilters): array
     {
         $availableFilters = [
+            'category' => 'Категорiї',
             'brend' => 'Бренд',
             'kolir' => 'Колiр',
             'rozmir-postacalnika' => 'Розмiр постачальника',
-            'sklad' => 'Склад'
+            'sklad' => 'Склад',
+            'price' => 'Цiна'
         ];
 
         $result = [];
@@ -102,6 +105,15 @@ class CatalogService
         $filteredProductIds = [];
         if (!empty($activeFilters)) {
             $filteredProductIds = $this->getFilteredProductIds($activeFilters);
+        }
+
+        //load all categories
+        $categoriesMap = [];
+        if (in_array('category', array_keys($availableFilters))) {
+            $categories = DB::table('categories')->get(['id', 'name']);
+            foreach ($categories as $category) {
+                $categoriesMap[$category->id] = $category->name;
+            }
         }
 
         // We process all available filters
@@ -133,8 +145,12 @@ class CatalogService
                 }
 
                 if ($count > 0) {
+                    // use name for categories
+                    $displayValue = $slug === 'category' ? ($categoriesMap[$filterValue] ?? $filterValue) : $filterValue;
+
                     $values[] = [
                         'value' => $filterValue,
+                        'display_value' => $displayValue,
                         'count' => $count,
                         'active' => isset($activeFilters[$slug]) &&
                             in_array($filterValue, (array)$activeFilters[$slug])
@@ -146,6 +162,10 @@ class CatalogService
             if (!empty($values)) {
                 usort($values, function($a, $b) {
                     return strcmp($a['value'], $b['value']);
+                });
+
+                usort($values, function($a, $b) {
+                    return strcmp($a['display_value'], $b['display_value']);
                 });
 
                 $result[] = [
