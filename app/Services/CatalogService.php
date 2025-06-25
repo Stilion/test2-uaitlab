@@ -54,6 +54,7 @@ class CatalogService
                     ]
                 ];
             }
+
             $query->whereIn('id', $productIds);
         }
 
@@ -69,17 +70,7 @@ class CatalogService
                 $query->orderBy('id');
         }
 
-        Log::info('Final SQL query:', [
-            'sql' => $query->toSql(),
-            'bindings' => $query->getBindings()
-        ]);
-
         $paginator = $query->paginate($limit, ['*'], 'page', $page);
-
-        Log::info('Query results:', [
-            'total' => $paginator->total(),
-            'items_count' => count($paginator->items())
-        ]);
 
         return [
             'data' => $paginator->items(),
@@ -102,6 +93,7 @@ class CatalogService
             'brend' => 'Бренд',
             'kolir' => 'Колiр',
             'rozmir-postacalnika' => 'Розмiр постачальника',
+            'sklad' => 'Склад'
         ];
 
         $result = [];
