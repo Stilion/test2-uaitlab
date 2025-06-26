@@ -38,7 +38,18 @@ class CatalogService
      */
     public function getProducts(int $page, int $limit, string $sortBy, array $filters): array
     {
-        $query = Product::query()->with(['attributes', 'images', 'categories']);
+        $query = Product::query()
+            ->select([
+                'id',
+                'name',
+                'price',
+                'currency_id',
+                'stock_quantity',
+                'vendor',
+                'description',
+                'available'
+            ])
+            ->with(['attributes', 'images', 'categories']);
 
         if (!empty($filters)) {
             $productIds = $this->getFilteredProductIds($filters);
@@ -161,11 +172,8 @@ class CatalogService
             // Sort values alphabetically
             if (!empty($values)) {
                 usort($values, function($a, $b) {
-                    return strcmp($a['value'], $b['value']);
-                });
-
-                usort($values, function($a, $b) {
-                    return strcmp($a['display_value'], $b['display_value']);
+                    $displayValueCompare = strcmp($a['display_value'], $b['display_value']);
+                    return $displayValueCompare !== 0 ? $displayValueCompare : strcmp($a['value'], $b['value']);
                 });
 
                 $result[] = [
